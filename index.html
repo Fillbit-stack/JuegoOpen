@@ -95,7 +95,7 @@
     <p>Puntuación: <span id="score">0</span> | Récord: <span id="record">0</span></p>
     <button onclick="pauseGame()">Pausar</button>
   </div>
-  <canvas id="gameCanvas" width="300" height="600"></canvas>
+  <canvas id="gameCanvas" width="150" height="300"></canvas>
   <div id="gameOverText">GAME OVER</div>
 
   <!-- Audios -->
@@ -117,7 +117,7 @@
     const ctx = canvas.getContext("2d");
     const ROWS = 20;
     const COLS = 10;
-    const SIZE = 30;
+    const SIZE = 15;  // Reducido a la mitad
     const letras = ["O", "P", "E", "N"];
     const colores = {
       O: "#003366",
@@ -183,14 +183,16 @@
     }
 
     function dibujarLetra(letra, x, y) {
-      ctx.fillStyle = colores[letra];
-      ctx.fillRect(x * SIZE, y * SIZE, SIZE, SIZE);
-      ctx.fillStyle = "white";
-      ctx.font = "20px sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(letra, x * SIZE + SIZE / 2, y * SIZE + SIZE / 2);
-    }
+  ctx.fillStyle = colores[letra];
+  ctx.fillRect(x * SIZE, y * SIZE, SIZE, SIZE);
+  
+  // Reducir el tamaño de la fuente
+  ctx.fillStyle = "white";
+  ctx.font = `${SIZE * 0.6}px sans-serif`; // Ajustar el tamaño de la fuente
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(letra, x * SIZE + SIZE / 2, y * SIZE + SIZE / 2);
+}
 
     function mover(dx, dy) {
       if (!pieza) return;
@@ -317,14 +319,15 @@
     }
 
     document.addEventListener("keydown", (e) => {
-      if (e.key === "ArrowLeft") mover(-1, 0);
-      if (e.key === "ArrowRight") mover(1, 0);
-      if (e.key === "ArrowDown") mover(0, 1);
+      if (e.key === "ArrowLeft") {
+        mover(-1, 0);
+      } else if (e.key === "ArrowRight") {
+        mover(1, 0);
+      } else if (e.key === "ArrowDown") {
+        mover(0, 1);
+      }
     });
 
-    // Música de inicio
-    audioIntro.play();
-    dibujar();
   </script>
 </body>
 </html>
