@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OPEN - Juego Tetris</title>
+
+  <!-- Aquí va SOLO el CSS -->
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background: #111;
+      color: white;
+      text-align: center;
+    }
+    canvas {
+      background: #222;
+      margin-top: 20px;
+      border: 3px solid white;
+    }
+
+    #scoreboard {
+      margin-top: 10px;
+    }
+    button {
+      margin: 10px;
+      padding: 10px 20px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+
+    #mobileControls {
+      position: fixed;
+      bottom: 20px;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      z-index: 2;
+    }
+
+    #mobileControls button {
+      padding: 15px 25px;
+      font-size: 1.2rem;
+      background-color: #333;
+      color: white;
+      border: 2px solid white;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+
+    #overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.9);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      z-index: 2;
+    }
+
+    #overlay img {
+      width: 200px;
+      margin-bottom: 20px;
+    }
+
+    #gameOverText {
+      position: absolute;
+      top: 40%;
+      width: 100%;
+      font-size: 48px;
+      color: red;
+      font-weight: bold;
+      text-shadow: 2px 2px black;
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="overlay">
+    <img src="logo.jpg" alt="Logo del juego">
+    <button onclick="startGame()">Iniciar Juego</button>
+    <button id="restartBtn" onclick="startGame()" style="display: none;">Reiniciar Juego</button>
+  </div>
+
+  <h1>Juego: Forma la palabra OPEN</h1>
+  <p>Haz filas, columnas o diagonales con las letras O-P-E-N para ganar puntos.</p>
+  <div id="scoreboard">
+    <p>Puntuación: <span id="score">0</span> | Récord: <span id="record">0</span></p>
+    <button onclick="pauseGame()">Pausar</button>
+  </div>
+  <canvas id="gameCanvas" width="300" height="600"></canvas>
+  <div id="gameOverText">GAME OVER</div>
+
+  <!-- Audios -->
+  <audio id="audioIntro" src="intro.mp3" loop></audio>
+  <audio id="audioJuego" src="juego.mp3" loop></audio>
+  <audio id="audioTic" src="tic.mp3"></audio>
+  <audio id="audioOpen" src="open.mp3"></audio>
+  <audio id="audioGameOver" src="gameover.mp3"></audio>
+
+  <!-- Controles móviles para mover las piezas -->
+  <div id="mobileControls">
+    <button id="leftBtn" onclick="mover(-1, 0)">Izquierda</button>
+    <button id="downBtn" onclick="mover(0, 1)">Abajo</button>
+    <button id="rightBtn" onclick="mover(1, 0)">Derecha</button>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const ROWS = 20;
+    const COLS = 10;
+    const SIZE = 30;
+    const letras = ["O", "P", "E", "N"];
+    const colores = {
+      O: "#003366",
+      P: "#3366cc",
+      E: "#40e0d0",
+      N: "#dda0dd"
+    };
+
+    const audioIntro = document.getElementById("audioIntro");
+    const audioJuego = document.getElementById("audioJuego");
+    const audioTic = document.getElementById("audioTic");
+    const audioOpen = document.getElementById("audioOpen");
+    const audioGameOver = document.getElementById("audioGameOver");
+
+    let tablero = [];
+    let pieza = null;
+    let score = 0;
+    let record = localStorage.getItem("openRecord") || 0;
+    document.getElementById("record").innerText = record;
+    let paused = false;
+    let timer;
+    let musicaActivada = true;
+
+    function crearTablero() {
+      tablero = Array.from({ length: ROWS }, () => Array(COLS).fill(""));
+    }
+
+    function nuevaPieza() {
+      const letra = letras[Math.floor(Math.random() * letras.length)];
+      pieza = { letra, x: 4, y: 0 };
+      if (tablero[0][4] !== "") finDelJuego();
+    }
+
+    function dibujar() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Dibujar cuadrícula
+      ctx.strokeStyle = "#333";
+      for (let x = 0; x <= COLS; x++) {
+        ctx.beginPath();
+        ctx.moveTo(x * SIZE, 0);
+        ctx.lineTo(x * SIZE, canvas.height);
+        ctx.stroke();
+      }
+      for (let y = 0; y <= ROWS; y++) {
+        ctx.beginPath();
+        ctx.moveTo(0, y * SIZE);
+        ctx.lineTo(canvas.width, y * SIZE);
+        ctx.stroke();
+      }
+
+      // Tablero
+      for (let y = 0; y < ROWS; y++) {
+        for (let x = 0; x < COLS; x++) {
+          if (tablero[y][x] !== "") {
+            dibujarLetra(tablero[y][x], x, y);
+          }
+        }
+      }
+
+      // Pieza activa
+      if (pieza) dibujarLetra(pieza.letra, pieza.x, pieza.y);
+    }
+
+    function dibujarLetra(letra, x, y) {
+      ctx.fillStyle = colores[letra];
+      ctx.fillRect(x * SIZE, y * SIZE, SIZE, SIZE);
+      ctx.fillStyle = "white";
+      ctx.font = "20px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(letra, x * SIZE + SIZE / 2, y * SIZE + SIZE / 2);
+    }
+
+    function mover(dx, dy) {
+      if (!pieza) return;
+      const nx = pieza.x + dx;
+      const ny = pieza.y + dy;
+      if (nx < 0 || nx >= COLS || ny >= ROWS || tablero[ny]?.[nx]) {
+        if (dy === 1) {
+          tablero[pieza.y][pieza.x] = pieza.letra;
+          verificarCombinaciones();
+          nuevaPieza();
+        }
+        return;
+      }
+      pieza.x = nx;
+      pieza.y = ny;
+      audioTic.currentTime = 0;
+      audioTic.play();
+    }
+
+    function verificarCombinaciones() {
+      const palabra = "OPEN";
+      const direcciones = [[1, 0], [0, 1], [1, 1], [-1, 1]];
+
+      for (let y = 0; y < ROWS; y++) {
+        for (let x = 0; x < COLS; x++) {
+          for (let [dx, dy] of direcciones) {
+            let letrasSeguidas = "";
+            let coords = [];
+            for (let i = 0; i < 4; i++) {
+              const nx = x + dx * i;
+              const ny = y + dy * i;
+              if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS) {
+                letrasSeguidas += tablero[ny][nx];
+                coords.push([nx, ny]);
+              }
+            }
+            if (letrasSeguidas === palabra) {
+              // Elimina las piezas que forman la palabra OPEN
+              for (const [cx, cy] of coords) tablero[cy][cx] = "";
+
+              // Reorganiza las piezas para que caigan hacia abajo
+              reorganizarTablero();
+
+              // Reproduce el sonido al completar la palabra
+              audioOpen.play();
+
+              // Aumenta la puntuación
+              score += 10;
+              document.getElementById("score").innerText = score;
+
+              // Actualiza el récord
+              if (score > record) {
+                record = score;
+                localStorage.setItem("openRecord", record);
+                document.getElementById("record").innerText = record;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    function reorganizarTablero() {
+      for (let col = 0; col < COLS; col++) {
+        let vacios = 0;
+        for (let row = ROWS - 1; row >= 0; row--) {
+          if (tablero[row][col] === "") {
+            vacios++;
+          } else if (vacios > 0) {
+            tablero[row + vacios][col] = tablero[row][col];
+            tablero[row][col] = "";
+          }
+        }
+      }
+    }
+
+    function actualizar() {
+      if (!paused) {
+        mover(0, 1);
+        dibujar();
+      }
+    }
+
+    function startGame() {
+      console.log("Iniciando juego...");
+      document.getElementById("overlay").style.display = "none";
+      document.getElementById("gameOverText").style.display = "none";
+      document.getElementById("restartBtn").style.display = "none"; // Ocultar el botón de reinicio
+
+      if (musicaActivada) {
+        audioIntro.pause();
+        audioIntro.currentTime = 0;
+        audioJuego.play();
+      }
+
+      crearTablero();
+      score = 0;
+      document.getElementById("score").innerText = score;
+      nuevaPieza();
+
+      clearInterval(timer);
+      timer = setInterval(actualizar, 800);
+    }
+
+    function pauseGame() {
+      paused = !paused;
+
+      if (paused) {
+        audioJuego.pause();
+      } else {
+        audioJuego.play();
+      }
+    }
+
+    function finDelJuego() {
+      audioJuego.pause();
+      audioGameOver.play();
+      clearInterval(timer);
+      document.getElementById("gameOverText").style.display = "block";
+
+      // Mostrar overlay con botón de reinicio
+      document.getElementById("overlay").style.display = "flex";
+      document.getElementById("restartBtn").style.display = "inline-block";
+    }
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowLeft") mover(-1, 0);
+      if (e.key === "ArrowRight") mover(1, 0);
+      if (e.key === "ArrowDown") mover(0, 1);
+    });
+
+    // Música de inicio
+    audioIntro.play();
+    dibujar();
+  </script>
+</body>
+</html>
